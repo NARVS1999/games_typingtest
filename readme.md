@@ -10,7 +10,7 @@ features:
 - Accuracy and WPM display
 
 
-Demo: 
+Demo: https://narvs1999.github.io/games_typingtest/
 
 ![Demo Image](demo-image.png)
 
