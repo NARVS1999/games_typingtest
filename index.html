@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Speed Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+        }
+        .word-prompt {
+            letter-spacing: 1px;
+            line-height: 1.5;
+        }
+        .target-words {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .word-box {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 1.1rem;
+        }
+        .current-word {
+            background-color: #86efac;
+        }
+        .flash-correct {
+            animation: flashGreen 0.5s;
+        }
+        .flash-incorrect {
+            animation: flashRed 0.5s;
+        }
+        @keyframes flashGreen {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: #bbf7d0; }
+        }
+        @keyframes flashRed {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: #fecaca; }
+        }
+        @media (max-width: 640px) {
+            .word-box {
+                font-size: 0.9rem;
+                padding: 0.1rem 0.3rem;
+            }
+            .stats-container {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="text-center mb-6">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-4 text-green-700">TYPING SPEED TEST</h1>
+    </div>
+
+    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-2xl mb-6">
+        <div class="text-sm sm:text-base mb-4 word-prompt">
+            📝 Type the following words:
+        </div>
+        <div class="text-base sm:text-lg mb-4 p-3 bg-gray-100 rounded-lg target-words" id="target-words"></div>
+        <input 
+            type="text" 
+            id="user-input" 
+            class="w-full p-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500" 
+            placeholder="Start typing here..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+        >
+        <div class="flex stats-container justify-between mt-4 text-sm sm:text-base">
+            <div>⌛ Time: <span id="time-left">01:00</span></div>
+            <div>🎯 Accuracy: <span id="accuracy">100</span>%</div>
+            <div>⚡ WPM: <span id="wpm">0</span></div>
+        </div>
+    </div>
+
+    <div class="flex gap-4 mb-6">
+        <button id="reset-btn" class="bg-green-700 hover:bg-green-800 text-white px-4 sm:px-6 py-2 rounded-lg shadow transition text-sm sm:text-base">
+            RESET TEST
+        </button>
+    </div>
+
+    <div class="text-center text-xs sm:text-sm text-gray-700">
+        <p>Press [ENTER] to submit each word</p>
+    </div>
+
+    <script>
+        // Game constants
+        const WORDS = [
+            'accurate', 'method', 'balance', 'unique', 'mountain',
+            'journey', 'quantum', 'velocity', 'xylophone', 'zephyr',
+            'algorithm', 'benevolent', 'cascade', 'dynamic', 'eloquent',
+            'fractal', 'gargantuan', 'harmony', 'infinite', 'jubilant',
+            'knowledge', 'luminous', 'momentum', 'navigate', 'oblivion',
+            'paradox', 'quintessential', 'resilient', 'synchronize', 'tranquil',
+            'ultimate', 'vibrant', 'wonder', 'xenial', 'yearning', 'zenith'
+        ];
+        const INITIAL_TIME = 60; // 60 seconds
+        const WORD_COUNT = 5;
+
+        // Game state
+        let gameState = {
+            targetWords: [],
+            currentWordIndex: 0,
+            userInput: '',
+            correctChars: 0,
+            totalChars: 0,
+            correctWords: 0,
+            startTime: null,
+            timerInterval: null,
+            timeLeft: INITIAL_TIME,
+            isRunning: false
+        };
+
+        // Initialize the game
+        function initGame() {
+            // Generate random words
+            gameState.targetWords = [];
+            for (let i = 0; i < WORD_COUNT; i++) {
+                const randomIndex = Math.floor(Math.random() * WORDS.length);
+                gameState.targetWords.push(WORDS[randomIndex]);
+            }
+            
+            // Reset game state
+            gameState.currentWordIndex = 0;
+            gameState.userInput = '';
+            gameState.correctChars = 0;
+            gameState.totalChars = 0;
+            gameState.correctWords = 0;
+            gameState.timeLeft = INITIAL_TIME;
+            gameState.isRunning = false;
+            
+            // Clear any existing timer
+            if (gameState.timerInterval) {
+                clearInterval(gameState.timerInterval);
+                gameState.timerInterval = null;
+            }
+            
+            // Update UI
+            updateTargetWords();
+            updateStats();
+            document.getElementById('user-input').value = '';
+            document.getElementById('user-input').disabled = false;
+            document.getElementById('user-input').focus();
+        }
+
+        // Start the game timer
+        function startTimer() {
+            if (gameState.isRunning) return;
+            
+            gameState.isRunning = true;
+            gameState.startTime = Date.now();
+            
+            gameState.timerInterval = setInterval(() => {
+                gameState.timeLeft--;
+                updateTimerDisplay();
+                
+                if (gameState.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            const minutes = Math.floor(gameState.timeLeft / 60);
+            const seconds = gameState.timeLeft % 60;
+            document.getElementById('time-left').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Update target words display
+        function updateTargetWords() {
+            const targetWordsEl = document.getElementById('target-words');
+            targetWordsEl.innerHTML = '';
+            
+            gameState.targetWords.forEach((word, index) => {
+                const wordSpan = document.createElement('span');
+                wordSpan.className = 'word-box';
+                
+                if (index === gameState.currentWordIndex) {
+                    wordSpan.classList.add('current-word');
+                }
+                
+                wordSpan.textContent = word;
+                targetWordsEl.appendChild(wordSpan);
+            });
+        }
+
+        // Update stats display
+        function updateStats() {
+            const accuracy = gameState.totalChars > 0 
+                ? Math.floor((gameState.correctChars / gameState.totalChars) * 100) 
+                : 100;
+            document.getElementById('accuracy').textContent = accuracy;
+            
+            const timeElapsed = (INITIAL_TIME - gameState.timeLeft) / 60 || 0.01;
+            const wpm = Math.floor(gameState.correctWords / timeElapsed);
+            document.getElementById('wpm').textContent = wpm;
+        }
+
+        // Handle user input
+        function handleInput(e) {
+            if (!gameState.isRunning) {
+                startTimer();
+            }
+            
+            gameState.userInput = e.target.value;
+            checkInput();
+        }
+
+        // Check user input against target word
+        function checkInput() {
+            const currentWord = gameState.targetWords[gameState.currentWordIndex];
+            let correctCount = 0;
+            
+            // Compare each character
+            for (let i = 0; i < gameState.userInput.length; i++) {
+                if (gameState.userInput[i] === currentWord[i]) {
+                    correctCount++;
+                }
+            }
+            
+            // Update accuracy stats (but only when typing, not after submit)
+            if (gameState.userInput.length > gameState.totalChars) {
+                gameState.correctChars += correctCount - (gameState.userInput.length - gameState.userInput.length);
+                gameState.totalChars = gameState.userInput.length;
+            }
+            
+            updateStats();
+        }
+
+        // Handle word submission
+        function handleSubmit(e) {
+            if (e.key !== 'Enter') return;
+            
+            const currentWord = gameState.targetWords[gameState.currentWordIndex];
+            const inputEl = document.getElementById('user-input');
+            
+            // Check if word is correct
+            if (gameState.userInput === currentWord) {
+                // Correct word
+                inputEl.classList.add('flash-correct');
+                setTimeout(() => inputEl.classList.remove('flash-correct'), 500);
+                gameState.correctWords++;
+            } else {
+                // Incorrect word
+                inputEl.classList.add('flash-incorrect');
+                setTimeout(() => inputEl.classList.remove('flash-incorrect'), 500);
+            }
+            
+            // Move to next word or end game
+            gameState.currentWordIndex++;
+            if (gameState.currentWordIndex >= gameState.targetWords.length) {
+                // Get new words if we've completed all current ones
+                gameState.targetWords = [];
+                for (let i = 0; i < WORD_COUNT; i++) {
+                    const randomIndex = Math.floor(Math.random() * WORDS.length);
+                    gameState.targetWords.push(WORDS[randomIndex]);
+                }
+                gameState.currentWordIndex = 0;
+            }
+            
+            // Reset input
+            gameState.userInput = '';
+            inputEl.value = '';
+            
+            // Update display
+            updateTargetWords();
+        }
+
+        // End the game
+        function endGame() {
+            clearInterval(gameState.timerInterval);
+            gameState.isRunning = false;
+            
+            // Disable input
+            document.getElementById('user-input').disabled = true;
+            
+            // Show final stats
+            const accuracy = gameState.totalChars > 0 
+                ? Math.floor((gameState.correctChars / gameState.totalChars) * 100) 
+                : 0;
+            const timeElapsed = INITIAL_TIME / 60;
+            const wpm = Math.floor(gameState.correctWords / timeElapsed);
+            
+            alert(`Time's up!\n\nYour Results:\nWPM: ${wpm}\nAccuracy: ${accuracy}%`);
+        }
+
+        // Event listeners
+        document.getElementById('user-input').addEventListener('input', handleInput);
+        document.getElementById('user-input').addEventListener('keydown', handleSubmit);
+        document.getElementById('reset-btn').addEventListener('click', initGame);
+
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>
